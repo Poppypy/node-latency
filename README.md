@@ -1,6 +1,6 @@
 <!--
   TODO:
-  - 将下方徽章里的 `popy/node-latency-gui` 替换为你的 GitHub 仓库：<OWNER>/<REPO>
+  - 本 README 默认指向 `Poppypy/node-latency`；如你 fork 了本项目，请替换为你自己的 <OWNER>/<REPO>
   - 如果你有 Logo，请将图片放到 `src/logo.png`（或修改下方路径）
 -->
 
@@ -16,10 +16,10 @@
 
 <p align="center">
   <img alt="build" src="https://img.shields.io/badge/build-passing-brightgreen" />
-  <img alt="license" src="https://img.shields.io/badge/license-TBD-lightgrey" />
+  <img alt="license" src="https://img.shields.io/github/license/Poppypy/node-latency?color=brightgreen" />
   <img alt="version" src="https://img.shields.io/badge/version-v0.1.0-blue" />
-  <a href="https://github.com/popy/node-latency-gui/stargazers">
-    <img alt="stars" src="https://img.shields.io/github/stars/popy/node-latency-gui?style=social" />
+  <a href="https://github.com/Poppypy/node-latency/stargazers">
+    <img alt="stars" src="https://img.shields.io/github/stars/Poppypy/node-latency?style=social" />
   </a>
 </p>
 
@@ -222,9 +222,8 @@ git push origin feat/your-feature
 
 ## 📄 许可证
 
-本项目许可证：MIT
+本项目许可证：MIT（详见 `LICENSE`）
 
 ## 👤 作者
 
 - popy
-
