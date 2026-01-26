@@ -222,7 +222,7 @@ git push origin feat/your-feature
 
 ## 📄 许可证
 
-本项目许可证：TBD（建议补充 `LICENSE` 文件后再发布）。
+本项目许可证：MIT
 
 ## 👤 作者
 
