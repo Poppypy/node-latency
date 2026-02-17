@@ -15,11 +15,17 @@ import (
 
 func BuildFilteredURLList(nodes []model.Node, results []model.Result, settings model.TestSettings) []string {
 	var lines []string
-	hasResults := len(results) > 0
+	hasEffectiveResults := false
+	for i := range nodes {
+		if i < len(results) && results[i].Done {
+			hasEffectiveResults = true
+			break
+		}
+	}
 
 	for i, node := range nodes {
-		// 如果有测试结果，只导出通过的节点
-		if hasResults {
+		// 仅当存在有效测试结果时，才限制为“只导出通过节点”
+		if hasEffectiveResults {
 			if i >= len(results) {
 				continue
 			}
@@ -544,11 +550,17 @@ func BuildFilteredProxyList(nodes []model.Node, results []model.Result, settings
 
 	var proxies []map[string]interface{}
 	nameCount := make(map[string]int)
-	hasResults := len(results) > 0
+	hasEffectiveResults := false
+	for i := range nodes {
+		if i < len(results) && results[i].Done {
+			hasEffectiveResults = true
+			break
+		}
+	}
 
 	for i, node := range nodes {
-		// 如果有测试结果，只导出通过的节点
-		if hasResults {
+		// 仅当存在有效测试结果时，才限制为“只导出通过节点”
+		if hasEffectiveResults {
 			if i >= len(results) {
 				continue
 			}

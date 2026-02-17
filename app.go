@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"node-latency/internal/clash"
+	"node-latency/internal/coreembed"
 	"node-latency/internal/model"
 	"node-latency/internal/parser"
 	"node-latency/internal/tester"
@@ -274,6 +275,13 @@ func (a *App) StartTest() error {
 		logf := func(format string, args ...interface{}) {
 			wailsRuntime.EventsEmit(a.ctx, "log", fmt.Sprintf(format, args...))
 		}
+
+		resolvedCorePath, resolveErr := coreembed.ResolveCorePath(settings.CorePath)
+		if resolveErr != nil {
+			logf("内核准备失败：%v", resolveErr)
+			return
+		}
+		settings.CorePath = resolvedCorePath
 
 		tester.RunTests(ctx, nodes, settings, func(idx int, res model.Result) {
 			a.mu.Lock()
