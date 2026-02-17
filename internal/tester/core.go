@@ -26,12 +26,13 @@ import (
 )
 
 type coreTester struct {
-	cmd     *exec.Cmd
-	apiURL  string
-	tempDir string
-	done    chan error
-	logPath string
-	logFile *os.File
+	cmd       *exec.Cmd
+	apiURL    string
+	mixedPort int
+	tempDir   string
+	done      chan error
+	logPath   string
+	logFile   *os.File
 }
 
 const batchSize = 200 // 每批处理的节点数量
@@ -205,7 +206,17 @@ func RunTestsWithCore(ctx context.Context, nodes []model.Node, settings model.Te
 }
 
 func testBatch(ctx context.Context, tester *coreTester, proxies []interface{}, proxyNames []string, indexMapping map[int]int, settings model.TestSettings, onResult func(idx int, res model.Result), logf func(string, ...interface{})) {
-	client := &http.Client{Timeout: settings.Timeout + 2*time.Second}
+	// 配置更大的连接池
+	transport := &http.Transport{
+		MaxIdleConns:        256,
+		MaxIdleConnsPerHost: 64,
+		IdleConnTimeout:     30 * time.Second,
+		DisableCompression:  true,
+	}
+	client := &http.Client{
+		Timeout:   settings.Timeout + 2*time.Second,
+		Transport: transport,
+	}
 	jobs := make(chan int)
 	var wg sync.WaitGroup
 
@@ -235,6 +246,10 @@ func testBatch(ctx context.Context, tester *coreTester, proxies []interface{}, p
 	workers := settings.Concurrency
 	if workers <= 0 {
 		workers = 1
+	}
+	// 限制最大并发数为 64，避免资源耗尽
+	if workers > 64 {
+		workers = 64
 	}
 	if workers > len(proxies) {
 		workers = len(proxies)
@@ -576,7 +591,7 @@ func startCoreTester(ctx context.Context, corePath string, proxies []interface{}
 		_ = os.RemoveAll(tempDir)
 		return nil, err
 	}
-	return &coreTester{cmd: cmd, apiURL: apiURL, tempDir: tempDir, done: done, logPath: logPath, logFile: logFile}, nil
+	return &coreTester{cmd: cmd, apiURL: apiURL, mixedPort: mixedPort, tempDir: tempDir, done: done, logPath: logPath, logFile: logFile}, nil
 }
 
 func waitForCore(apiURL string, timeout time.Duration, done <-chan error) error {
@@ -642,6 +657,256 @@ func readLogTail(path string, maxLines int) string {
 		lines = lines[len(lines)-maxLines:]
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+// QueryExitIPInfo 查询通过指定代理的出口 IP 信息
+func QueryExitIPInfo(ctx context.Context, corePath string, nodes []model.Node, settings model.TestSettings, onProgress func(done, total int), logf func(string, ...interface{})) map[int]*model.IPInfo {
+	results := make(map[int]*model.IPInfo)
+	if len(nodes) == 0 {
+		return results
+	}
+
+	// 构建代理配置
+	var proxies []interface{}
+	var proxyNames []string
+	proxyNameByIndex := make(map[int]string) // node index -> proxy name
+	nameCount := make(map[string]int)
+
+	for i, node := range nodes {
+		base := strings.TrimSpace(node.Name)
+		if base == "" {
+			base = fmt.Sprintf("节点_%d", i+1)
+		}
+		name := uniqueName(base, nameCount)
+
+		proxy, err := clash.NodeToClashProxy(node, name)
+		if err != nil {
+			continue
+		}
+
+		if err := clash.ValidateClashProxy(proxy); err != nil {
+			continue
+		}
+
+		proxyNameByIndex[i] = name
+		proxies = append(proxies, proxy)
+		proxyNames = append(proxyNames, name)
+	}
+
+	if len(proxies) == 0 {
+		if logf != nil {
+			logf("没有可用于查询出口 IP 的节点")
+		}
+		return results
+	}
+
+	if logf != nil {
+		logf("开始查询 %d 个节点的出口 IP...", len(proxies))
+	}
+
+	// 解析内核路径
+	resolvedCorePath := corePath
+	if resolvedCorePath == "" {
+		var err error
+		resolvedCorePath, err = resolveCorePath("")
+		if err != nil {
+			if logf != nil {
+				logf("未找到内核：%v", err)
+			}
+			return results
+		}
+	}
+
+	// 启动 Mihomo 内核
+	tester, err := startCoreTester(ctx, resolvedCorePath, proxies, proxyNames, settings.CoreStartTimeout)
+	if err != nil {
+		if logf != nil {
+			logf("启动内核查询出口 IP 失败：%v", err)
+		}
+		return results
+	}
+	defer tester.Close()
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	ipURL := settings.IPLookupURL
+	if ipURL == "" {
+		ipURL = model.DefaultIPLookupURL
+	}
+	// 将 {ip} 替换为空，因为我们要查的是出口 IP
+	ipURL = strings.ReplaceAll(ipURL, "{ip}", "")
+
+	var mu sync.Mutex           // 保护 results 和 completed
+	var proxyMu sync.Mutex       // 保护代理切换 + 请求的原子性
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 20) // 并发限制
+	completed := 0
+
+	for i, proxyName := range proxyNames {
+		if ctx.Err() != nil {
+			break
+		}
+
+		wg.Add(1)
+		go func(nodeIdx int, name string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+
+			// 使用锁保证"切换代理 + 发请求"是原子操作
+			proxyMu.Lock()
+			info := queryProxyExitIP(ctx, client, tester.apiURL, tester.mixedPort, name, ipURL)
+			proxyMu.Unlock()
+
+			if info != nil {
+				mu.Lock()
+				results[nodeIdx] = info
+				mu.Unlock()
+			}
+
+			mu.Lock()
+			completed++
+			if onProgress != nil {
+				onProgress(completed, len(proxyNames))
+			}
+			mu.Unlock()
+		}(i, proxyName)
+	}
+
+	wg.Wait()
+
+	if logf != nil {
+		logf("出口 IP 查询完成：%d/%d 成功", len(results), len(proxies))
+	}
+
+	return results
+}
+
+// queryProxyExitIP 通过指定代理查询出口 IP
+func queryProxyExitIP(ctx context.Context, client *http.Client, apiURL string, mixedPort int, proxyName, ipURL string) *model.IPInfo {
+	// 1. 先切换 AUTO 组到指定代理
+	selectURL := fmt.Sprintf("%s/proxies/AUTO", apiURL)
+	selectBody := fmt.Sprintf(`{"name":"%s"}`, proxyName)
+	req, err := http.NewRequestWithContext(ctx, "PUT", selectURL, strings.NewReader(selectBody))
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil
+	}
+	resp.Body.Close()
+
+	// 2. 通过 mixed-port 发送请求到 IP API
+	// 使用 HTTP 代理
+	proxyURL := fmt.Sprintf("http://127.0.0.1:%d", mixedPort)
+	proxy, err := url.Parse(proxyURL)
+	if err != nil {
+		return nil
+	}
+
+	proxyClient := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			Proxy: http.ProxyURL(proxy),
+		},
+	}
+
+	req, err = http.NewRequestWithContext(ctx, "GET", ipURL, nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("User-Agent", "node-latency/1.0")
+
+	resp, err = proxyClient.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil
+	}
+
+	return parseIPInfoFromResponse(body)
+}
+
+// parseIPInfoFromResponse 从响应中解析 IP 信息
+func parseIPInfoFromResponse(body []byte) *model.IPInfo {
+	// 先尝试解析 Mihomo delay 响应格式
+	var delayResp struct {
+		Delay   int64  `json:"delay"`
+		Message string `json:"message"`
+	}
+
+	// 如果是 delay 格式，message 中可能包含 IP API 的响应
+	if err := json.Unmarshal(body, &delayResp); err == nil && delayResp.Delay > 0 {
+		// delay 响应，无法获取 IP 信息
+		return nil
+	}
+
+	// 尝试直接解析为 IP API 响应
+	var raw map[string]interface{}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil
+	}
+
+	// 检查是否是有效的 IP API 响应
+	status := ""
+	if s, ok := raw["status"].(string); ok {
+		status = s
+	}
+	if status != "" && status != "success" {
+		return nil
+	}
+
+	info := &model.IPInfo{
+		IP:      firstString(raw, "query", "ip"),
+		Country: firstString(raw, "country", "country_name"),
+		Region:  firstString(raw, "regionName", "region"),
+		City:    firstString(raw, "city"),
+		ISP:     firstString(raw, "isp"),
+		Org:     firstString(raw, "org"),
+		ASN:     firstString(raw, "as"),
+	}
+
+	if v, ok := raw["hosting"].(bool); ok {
+		info.Hosting = v
+	}
+	if v, ok := raw["proxy"].(bool); ok {
+		info.Proxy = v
+	}
+	if v, ok := raw["mobile"].(bool); ok {
+		info.Mobile = v
+	}
+
+	// 验证至少有 IP
+	if info.IP == "" {
+		return nil
+	}
+
+	return info
+}
+
+func firstString(m map[string]interface{}, keys ...string) string {
+	for _, k := range keys {
+		if v, ok := m[k]; ok {
+			if s, ok := v.(string); ok && s != "" {
+				return s
+			}
+		}
+	}
+	return ""
 }
 
 func coreDelay(client *http.Client, apiURL, proxyName, testURL string, timeout time.Duration) (time.Duration, error) {

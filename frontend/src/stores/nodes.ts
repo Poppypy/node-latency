@@ -29,6 +29,7 @@ export const useNodeStore = defineStore('nodes', () => {
   const results = reactive<Record<number, any>>({})
   const running = ref(false)
   const progress = ref({ total: 0, done: 0, passed: 0, running: false })
+  const ipLookupProgress = ref({ done: 0, total: 0 })
   const logs = ref<string[]>([])
   const settings = ref<model.TestSettings>(new model.TestSettings())
   const selectedIndices = ref<Set<number>>(new Set())
@@ -57,6 +58,20 @@ export const useNodeStore = defineStore('nodes', () => {
     EventsOn('log', (msg: string) => {
       addLog(msg)
     })
+    EventsOn('nodes-updated', (updatedNodes: any) => {
+      if (Array.isArray(updatedNodes)) {
+        nodes.value = updatedNodes
+      }
+    })
+    EventsOn('ip-lookup-progress', (event: any) => {
+      ipLookupProgress.value = { done: event.done || 0, total: event.total || 0 }
+
+      // 出口 IP 查询结束后，同步关闭运行态，避免 UI 一直停留在“测试中”
+      if ((event.done || 0) >= (event.total || 0) && (event.total || 0) > 0) {
+        running.value = false
+        progress.value.running = false
+      }
+    })
   }
 
   function teardownListeners() {
@@ -64,6 +79,8 @@ export const useNodeStore = defineStore('nodes', () => {
     EventsOff('test-progress')
     EventsOff('test-complete')
     EventsOff('log')
+    EventsOff('nodes-updated')
+    EventsOff('ip-lookup-progress')
   }
 
   function addLog(msg: string) {
@@ -162,7 +179,9 @@ export const useNodeStore = defineStore('nodes', () => {
 
   async function startTest(): Promise<void> {
     running.value = true
+    progress.value.running = true
     clearResults()
+    ipLookupProgress.value = { done: 0, total: 0 }
     await StartTest()
   }
 
@@ -232,6 +251,7 @@ export const useNodeStore = defineStore('nodes', () => {
     results,
     running,
     progress,
+    ipLookupProgress,
     logs,
     settings,
     selectedIndices,

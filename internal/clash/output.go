@@ -109,15 +109,46 @@ func buildSSURL(node model.Node, newName string) (string, error) {
 	if node.SS == nil {
 		return node.Raw, nil
 	}
+
+	// 对于 SS 2022 加密方式，密码包含特殊字符，需要使用 base64 编码的 userinfo 格式
+	// SIP002 格式: ss://BASE64(method:password)@host:port#name
+	method := node.SS.Method
+	password := node.SS.Password
+
+	// 检查是否是 SS 2022 加密方式或密码包含特殊字符
+	isSS2022 := strings.HasPrefix(method, "2022-")
+	hasSpecialChars := strings.ContainsAny(password, "+/=")
+
+	if isSS2022 || hasSpecialChars {
+		// 使用 base64 编码的 userinfo 格式
+		userinfo := base64.StdEncoding.EncodeToString([]byte(method + ":" + password))
+		u := &url.URL{
+			Scheme:   "ss",
+			Host:     net.JoinHostPort(node.Host, strconv.Itoa(node.Port)),
+			RawPath:  "//" + userinfo + "@" + net.JoinHostPort(node.Host, strconv.Itoa(node.Port)),
+			Fragment: newName,
+		}
+		// 手动构建 URL
+		result := fmt.Sprintf("ss://%s@%s", userinfo, u.Host)
+		if node.SS.Plugin != "" {
+			result += "?" + node.SS.Plugin
+		}
+		if newName != "" {
+			result += "#" + url.PathEscape(newName)
+		}
+		return result, nil
+	}
+
+	// 普通格式使用 url.UserPassword
 	u := &url.URL{
-		Scheme: "ss",
-		User:   url.UserPassword(node.SS.Method, node.SS.Password),
-		Host:   net.JoinHostPort(node.Host, strconv.Itoa(node.Port)),
+		Scheme:   "ss",
+		User:     url.UserPassword(method, password),
+		Host:     net.JoinHostPort(node.Host, strconv.Itoa(node.Port)),
+		Fragment: newName,
 	}
 	if node.SS.Plugin != "" {
 		u.RawQuery = node.SS.Plugin
 	}
-	u.Fragment = newName
 	return u.String(), nil
 }
 
@@ -231,9 +262,19 @@ func buildTrojanURLFromClash(m map[string]interface{}, node model.Node, newName 
 
 	// 构建查询参数
 	params := url.Values{}
+
+	// 安全相关参数
+	if skipVerify, _ := util.GetBoolFromMap(m, "skip-cert-verify"); skipVerify {
+		params.Set("allowInsecure", "1")
+	}
 	if sni := util.GetStringFromMap(m, "sni"); sni != "" {
 		params.Set("sni", sni)
 	}
+	if fingerprint := util.GetStringFromMap(m, "client-fingerprint"); fingerprint != "" {
+		params.Set("fp", fingerprint)
+	}
+
+	// 网络类型
 	network := util.GetStringFromMap(m, "network")
 	if network != "" {
 		params.Set("type", network)
@@ -247,6 +288,20 @@ func buildTrojanURLFromClash(m map[string]interface{}, node model.Node, newName 
 				params.Set("host", host)
 			}
 		}
+	}
+
+	// grpc
+	if network == "grpc" {
+		if grpcOpts, ok := m["grpc-opts"].(map[string]interface{}); ok {
+			if serviceName, ok := grpcOpts["grpc-service-name"].(string); ok && serviceName != "" {
+				params.Set("serviceName", serviceName)
+			}
+		}
+	}
+
+	// flow (for reality)
+	if flow := util.GetStringFromMap(m, "flow"); flow != "" {
+		params.Set("flow", flow)
 	}
 
 	u.RawQuery = params.Encode()
@@ -311,6 +366,27 @@ func buildSSURLFromClash(m map[string]interface{}, node model.Node, newName stri
 		return "", nil
 	}
 
+	// 检查是否是 SS 2022 加密方式或密码包含特殊字符
+	isSS2022 := strings.HasPrefix(method, "2022-")
+	hasSpecialChars := strings.ContainsAny(password, "+/=")
+
+	if isSS2022 || hasSpecialChars {
+		// 使用 base64 编码的 userinfo 格式
+		userinfo := base64.StdEncoding.EncodeToString([]byte(method + ":" + password))
+		host := net.JoinHostPort(node.Host, strconv.Itoa(node.Port))
+		result := fmt.Sprintf("ss://%s@%s", userinfo, host)
+
+		// 处理 plugin
+		if plugin := util.GetStringFromMap(m, "plugin"); plugin != "" {
+			result += "?plugin=" + plugin
+		}
+
+		if newName != "" {
+			result += "#" + url.PathEscape(newName)
+		}
+		return result, nil
+	}
+
 	u := &url.URL{
 		Scheme: "ss",
 		User:   url.UserPassword(method, password),
@@ -319,10 +395,7 @@ func buildSSURLFromClash(m map[string]interface{}, node model.Node, newName stri
 
 	// 处理 plugin
 	if plugin := util.GetStringFromMap(m, "plugin"); plugin != "" {
-		pluginOpts := util.GetStringFromMap(m, "plugin-opts")
-		if pluginOpts != "" {
-			u.RawQuery = "plugin=" + plugin + "&" + pluginOpts
-		}
+		u.RawQuery = "plugin=" + plugin
 	}
 
 	u.Fragment = newName

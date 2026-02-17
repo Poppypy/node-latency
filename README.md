@@ -19,6 +19,20 @@
 
 ---
 
+## 📸 Screenshots
+
+<div align="center">
+  <img src="src/运行截图.png" alt="Main Interface" width="600"/>
+  <p><em>Main Interface</em></p>
+</div>
+
+<div align="center">
+  <img src="src/测试结果.jpg" alt="Test Results" width="600"/>
+  <p><em>Test Results</em></p>
+</div>
+
+---
+
 ## ✨ Features
 
 Built with cutting-edge technologies for maximum performance and developer experience:
@@ -35,6 +49,7 @@ Built with cutting-edge technologies for maximum performance and developer exper
 - 🚀 **Multi-Protocol Support** — VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC, SOCKS5, HTTP
 - 📥 **Flexible Import** — Import nodes from subscriptions, files, or paste directly
 - ⚡ **Mihomo-Powered Testing** — Accurate latency testing using the Mihomo (Clash Meta) core
+- 🌍 **Exit IP Detection** — Query real exit IP location for accurate node renaming
 - 📊 **Real-Time Results** — Live progress updates and detailed test results
 - 📤 **Smart Export** — Export passing nodes as Clash YAML or shareable links
 - 🎨 **Modern UI** — Clean, responsive interface with virtual scrolling for large node lists
@@ -93,6 +108,29 @@ The compiled binary will be available in the `build/bin/` directory.
 | TUIC | `tuic://...` | ✅ |
 | SOCKS5 | `socks5://...` | ✅ |
 | HTTP | `http://...` | ✅ |
+
+---
+
+## ⚠️ Important Notes
+
+### Concurrency Settings
+
+- **Recommended: 16-64** — Higher values may cause inaccurate results
+- Too high concurrency can lead to rate limiting or resource exhaustion
+- For large node lists (500+), use batch mode in settings
+
+### Exit IP Renaming
+
+- Enable "Rename by Exit IP" to get accurate node locations
+- This queries the real exit IP after testing (not the server IP)
+- Requires Mihomo core to be present
+
+### Import Formats Supported
+
+- Subscription URLs (base64 encoded or YAML)
+- YAML Clash config files
+- Node links (one per line)
+- YAML flow format: `{name: xxx, type: trojan, server: x.x.x.x, ...}`
 
 ---
 

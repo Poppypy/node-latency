@@ -92,6 +92,7 @@ onMounted(() => {
         <div>
           <label class="block text-gray-400 mb-1">并发数</label>
           <input v-model.number="settings.concurrency" type="number" min="1" max="256" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 focus:border-blue-500 focus:outline-none" />
+          <p class="text-gray-500 text-[10px] mt-1">建议 16-64，过高可能导致误判</p>
         </div>
       </div>
 
@@ -115,12 +116,12 @@ onMounted(() => {
       <div class="border-t border-gray-700 pt-2">
         <label class="flex items-center gap-2 cursor-pointer mb-2">
           <input v-model="settings.ipRename" type="checkbox" class="rounded bg-gray-700 border-gray-600 text-blue-500" />
-          <span class="text-gray-300">根据 IP 地理位置重命名</span>
+          <span class="text-gray-300">根据出口 IP 重命名（测试后）</span>
         </label>
         <div v-if="settings.ipRename" class="space-y-2">
           <input v-model="settings.ipNameFmt" type="text" placeholder="命名格式" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 focus:border-blue-500 focus:outline-none" />
           <p class="text-gray-500 text-[10px]">
-            可用: {region} {city} {country} {isp} {random}
+            测试通过后查询真实出口 IP，可用: {region} {city} {country} {isp} {random}
           </p>
         </div>
       </div>

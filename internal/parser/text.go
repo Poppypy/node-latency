@@ -199,6 +199,26 @@ func parseNodesFromLines(text string) ([]model.Node, []string, error) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
+
+		// 尝试解析为 YAML flow 格式: {name: xxx, type: trojan, ...} 或 - {name: xxx, ...}
+		if strings.HasPrefix(line, "{") || (strings.HasPrefix(line, "- {") && strings.Contains(line, "type:")) {
+			// 移除开头的 "- "
+			proxyLine := strings.TrimPrefix(line, "- ")
+			proxyLine = strings.TrimSpace(proxyLine)
+
+			var proxyMap map[string]interface{}
+			if err := yaml.Unmarshal([]byte(proxyLine), &proxyMap); err == nil {
+				node, err := ParseNodeFromClashProxy(proxyMap)
+				if err == nil {
+					if cleaned, ok := SanitizeNode(node); ok {
+						cleaned.Index = len(nodes) + 1
+						nodes = append(nodes, cleaned)
+						continue
+					}
+				}
+			}
+		}
+
 		node, err := ParseNode(line)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("line %d: %v", lineNum, err))

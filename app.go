@@ -268,17 +268,6 @@ func (a *App) StartTest() error {
 			wailsRuntime.EventsEmit(a.ctx, "test-complete", nil)
 		}()
 
-		// Optional: IP rename before testing
-		if settings.IPRename {
-			util.RefreshIPInfo(ctx, nodes, settings, func(format string, args ...interface{}) {
-				wailsRuntime.EventsEmit(a.ctx, "log", fmt.Sprintf(format, args...))
-			})
-			util.ApplyRegionsAndNames(nodes, settings)
-			a.mu.Lock()
-			a.nodes = nodes
-			a.mu.Unlock()
-		}
-
 		done, passed := 0, 0
 		total := len(nodes)
 
@@ -316,6 +305,52 @@ func (a *App) StartTest() error {
 				Running: true,
 			})
 		}, logf)
+
+		// 测试完成后，对通过的节点查询出口 IP 并重命名
+		if settings.IPRename && passed > 0 {
+			a.mu.Lock()
+			currentNodes := a.nodes
+			currentResults := a.results
+			a.mu.Unlock()
+
+			// 收集通过的节点
+			var passingNodes []model.Node
+			var passingIndices []int // 记录在原数组中的索引
+			for i, node := range currentNodes {
+				if i < len(currentResults) && currentResults[i].Pass {
+					passingNodes = append(passingNodes, node)
+					passingIndices = append(passingIndices, i)
+				}
+			}
+
+			if len(passingNodes) > 0 {
+				logf("开始查询 %d 个通过节点的出口 IP...", len(passingNodes))
+
+				// 查询出口 IP
+				ipInfoMap := tester.QueryExitIPInfo(ctx, settings.CorePath, passingNodes, settings,
+					func(done, total int) {
+						wailsRuntime.EventsEmit(a.ctx, "ip-lookup-progress", map[string]int{
+							"done":  done,
+							"total": total,
+						})
+					}, logf)
+
+				// 更新节点的 IPInfo 并重命名
+				a.mu.Lock()
+				for i, nodeIdx := range passingIndices {
+					if info, ok := ipInfoMap[i]; ok && info != nil {
+						a.nodes[nodeIdx].IPInfo = info
+					}
+				}
+
+				// 应用重命名
+				util.ApplyRegionsAndNames(a.nodes, settings)
+				a.mu.Unlock()
+
+				// 通知前端更新节点列表
+				wailsRuntime.EventsEmit(a.ctx, "nodes-updated", model.ToNodeDTOs(a.nodes))
+			}
+		}
 	}()
 	return nil
 }

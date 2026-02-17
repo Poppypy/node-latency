@@ -7,6 +7,7 @@ const parentRef = ref<HTMLElement | null>(null)
 
 // Simple virtual scrolling implementation
 const itemHeight = 40
+const bottomSafePadding = 16
 const bufferSize = 10
 const scrollTop = ref(0)
 const viewportHeight = ref(600)
@@ -72,7 +73,7 @@ function handleRowClick(index: number, event: MouseEvent) {
 <template>
   <div class="flex flex-col h-full">
     <!-- Table Header -->
-    <div class="sticky top-0 z-10 bg-gray-800 text-gray-300 text-sm font-medium border-b border-gray-700">
+    <div class="bg-gray-800 text-gray-300 text-sm font-medium border-b border-gray-700">
       <div class="grid grid-cols-8">
         <div class="px-2 py-2 text-center w-10">
           <input
@@ -93,8 +94,8 @@ function handleRowClick(index: number, event: MouseEvent) {
     </div>
 
     <!-- Scroll Area -->
-    <div ref="parentRef" class="flex-1 overflow-auto" @scroll="onScroll">
-      <div :style="{ height: `${store.nodes.length * itemHeight}px`, position: 'relative' }">
+    <div ref="parentRef" class="flex-1 overflow-y-auto overflow-x-hidden pb-2 min-h-0" @scroll="onScroll">
+      <div :style="{ height: `${store.nodes.length * itemHeight + bottomSafePadding}px`, position: 'relative' }">
         <div
           v-for="{ index, node } in visibleNodes"
           :key="index"
@@ -145,7 +146,7 @@ function handleRowClick(index: number, event: MouseEvent) {
     </div>
 
     <!-- Selection Actions -->
-    <div v-if="store.nodes.length > 0" class="sticky bottom-0 z-10 bg-gray-800 border-t border-gray-700 px-3 py-2">
+    <div v-if="store.nodes.length > 0" class="bg-gray-800 border-t border-gray-700 px-3 py-2 flex-shrink-0">
       <div class="flex items-center justify-between text-xs">
         <div class="text-gray-400">
           共 {{ store.nodes.length }} 个节点，已选 {{ store.selectedCount }} 个

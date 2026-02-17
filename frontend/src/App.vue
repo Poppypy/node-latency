@@ -27,6 +27,9 @@ onUnmounted(() => {
         <span>节点数: {{ store.nodes.length }}</span>
         <span>通过: {{ store.passingNodes }}</span>
         <span v-if="store.running" class="text-green-400 animate-pulse">测试中...</span>
+        <span v-else-if="store.ipLookupProgress.total > 0" class="text-blue-400">
+          查询出口IP: {{ store.ipLookupProgress.done }}/{{ store.ipLookupProgress.total }}
+        </span>
       </div>
     </header>
 
