@@ -1,0 +1,25 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "node-latency",
+  "outputfilename": "node-latency",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "popy",
+    "email": ""
+  },
+  "info": {
+    "companyName": "",
+    "productName": "节点延迟测试",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright 2026",
+    "comments": "Proxy node latency testing tool"
+  },
+  "nsis": {
+    "include": [
+      "mihomo-windows-amd64-v3.exe"
+    ]
+  }
+}
