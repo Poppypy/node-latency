@@ -11,7 +11,7 @@
 
 <img src="logo.png" alt="Node Latency Logo" width="200"/>
 
-*导入节�� · 测试延迟 · 导出优选 — 尽在一款精美的图形界面*
+*导入节点 · 测试延迟 · 导出优选 — 尽在一款精美的图形界面*
 
 [English](./README.md) · 简体中文
 
@@ -25,7 +25,7 @@
 
 - **[Go][go-official]** — 极速编译型后端，并发性能卓越
 - **[Wails][wails]** — 轻量级桌面应用框架，原生性能体验
-- **[Vue 3][vue]** — 现���化响应式前端框架
+- **[Vue 3][vue]** — 现代化响应式前端框架
 - **[TypeScript][typescript]** — 类型安全的 JavaScript，提升开发体验
 - **[TailwindCSS][tailwind]** — 实用优先的 CSS 框架
 - **[Pinia][pinia]** — Vue 官方推荐的状态管理库
