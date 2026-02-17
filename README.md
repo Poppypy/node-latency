@@ -13,7 +13,7 @@
 
 *Import nodes, test latency, export the best — all in one beautiful GUI*
 
-[English](#) · [简体中文](#)
+[English](./README.md) · [简体中文](./README.zh-CN.md)
 
 </div>
 
