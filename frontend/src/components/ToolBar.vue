@@ -29,8 +29,8 @@ function handleStop() {
 }
 
 async function handleSaveYAML() {
-  if (store.passingNodes === 0) {
-    store.addLog('没有通过的节点可导出')
+  if (store.nodes.length === 0) {
+    store.addLog('没有节点可导出')
     return
   }
   saving.value = true
@@ -46,8 +46,8 @@ async function handleSaveYAML() {
 }
 
 async function handleSaveYAMLFlow() {
-  if (store.passingNodes === 0) {
-    store.addLog('没有通过的节点可导出')
+  if (store.nodes.length === 0) {
+    store.addLog('没有节点可导出')
     return
   }
   saving.value = true
@@ -64,8 +64,8 @@ async function handleSaveYAMLFlow() {
 }
 
 async function handleSaveLinks() {
-  if (store.passingNodes === 0) {
-    store.addLog('没有通过的节点可导出')
+  if (store.nodes.length === 0) {
+    store.addLog('没有节点可导出')
     return
   }
   try {
@@ -94,8 +94,8 @@ function deselectAllTypes() {
 }
 
 async function doFilteredExport() {
-  if (store.passingNodes === 0) {
-    store.addLog('没有通过的节点可导出')
+  if (store.nodes.length === 0) {
+    store.addLog('没有节点可导出')
     return
   }
   if (selectedTypes.value.size === 0) {
@@ -191,7 +191,7 @@ onMounted(() => {
       <div class="relative">
         <button
           @click="showExportMenu = !showExportMenu"
-          :disabled="store.passingNodes === 0"
+          :disabled="store.nodes.length === 0"
           class="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 rounded text-sm font-medium transition-colors flex items-center gap-1"
         >
           导出

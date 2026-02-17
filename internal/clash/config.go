@@ -36,7 +36,7 @@ func BuildClashConfig(templatePath string, nodes []model.Node, results []model.R
 		oldNames := extractProxyNames(root)
 		proxies, names := BuildClashProxies(nodes, results, settings)
 		if len(names) == 0 {
-			return nil, nil, errors.New("没有通过的节点可导出")
+			return nil, nil, errors.New("没有节点可导出")
 		}
 		root["proxies"] = proxies
 		updateProxyGroups(root, oldNames, names)
@@ -50,7 +50,7 @@ func BuildClashConfig(templatePath string, nodes []model.Node, results []model.R
 	oldNames := extractProxyNames(root)
 	proxies, names := BuildClashProxies(nodes, results, settings)
 	if len(names) == 0 {
-		return nil, nil, errors.New("没有通过的节点可导出")
+		return nil, nil, errors.New("没有节点可导出")
 	}
 	root["proxies"] = proxies
 	updateProxyGroups(root, oldNames, names)
@@ -61,13 +61,23 @@ func BuildClashProxies(nodes []model.Node, results []model.Result, settings mode
 	var proxies []interface{}
 	var names []string
 	nameCount := make(map[string]int)
+	hasResults := len(results) > 0
+
 	for i, node := range nodes {
-		if i >= len(results) {
-			continue
+		// 如果有测试结果，只导出通过的节点
+		if hasResults {
+			if i >= len(results) {
+				continue
+			}
+			res := results[i]
+			if !res.Done || !res.Pass {
+				continue
+			}
 		}
-		res := results[i]
-		if !res.Done || !res.Pass {
-			continue
+
+		var res model.Result
+		if i < len(results) {
+			res = results[i]
 		}
 		baseName, _ := util.BuildOutputName(node, settings, res)
 		// 对名称进行地区缩写和 URL 解码处理

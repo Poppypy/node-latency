@@ -402,7 +402,7 @@ func (a *App) ExportNodeLinks() (string, error) {
 
 	lines := clash.BuildFilteredURLList(nodes, results, settings)
 	if len(lines) == 0 {
-		return "", errors.New("没有通过的节点可导出")
+		return "", errors.New("没有节点可导出")
 	}
 	return strings.Join(lines, "\n"), nil
 }
@@ -441,7 +441,7 @@ func (a *App) ExportYAMLFlow() (string, error) {
 
 	lines := clash.BuildYAMLFlowList(nodes, results, settings, nil)
 	if len(lines) == 0 {
-		return "", errors.New("没有通过的节点可导出")
+		return "", errors.New("没有节点可导出")
 	}
 	return strings.Join(lines, "\n"), nil
 }

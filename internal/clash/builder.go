@@ -208,6 +208,7 @@ func buildVmessProxy(node model.Node, name string) (map[string]interface{}, erro
 		"port":   port,
 		"uuid":   uuid,
 		"udp":    true,
+		"alterId": 0,
 	}
 	cipher := util.FirstNonEmpty(util.GetString(fields, "scy"), util.GetString(fields, "cipher"))
 	if strings.TrimSpace(cipher) == "" {
@@ -261,12 +262,19 @@ func buildSSProxy(node model.Node, name string) (map[string]interface{}, error) 
 	if node.SS == nil {
 		return nil, errors.New("无效的 ss 节点")
 	}
+
+	// 验证加密方式
+	method := node.SS.Method
+	if !isValidSSCipher(method) {
+		return nil, fmt.Errorf("ss 加密方式无效：%s", method)
+	}
+
 	proxy := map[string]interface{}{
 		"name":     name,
 		"type":     "ss",
 		"server":   node.Host,
 		"port":     node.Port,
-		"cipher":   node.SS.Method,
+		"cipher":   method,
 		"password": node.SS.Password,
 		"udp":      true,
 	}
@@ -277,6 +285,41 @@ func buildSSProxy(node model.Node, name string) (map[string]interface{}, error) 
 		}
 	}
 	return proxy, nil
+}
+
+// isValidSSCipher 检查是否是有效的 SS 加密方式
+func isValidSSCipher(cipher string) bool {
+	validCiphers := map[string]bool{
+		// AEAD
+		"aes-128-gcm":           true,
+		"aes-256-gcm":           true,
+		"chacha20-ietf-poly1305": true,
+		"2022-blake3-aes-128-gcm": true,
+		"2022-blake3-aes-256-gcm": true,
+		"2022-blake3-chacha8-poly1305": true,
+		// Stream
+		"aes-128-cfb":      true,
+		"aes-128-ctr":      true,
+		"aes-192-cfb":      true,
+		"aes-192-ctr":      true,
+		"aes-256-cfb":      true,
+		"aes-256-ctr":      true,
+		"rc4-md5":          true,
+		"chacha20":         true,
+		"chacha20-ietf":    true,
+		"xchacha20":        true,
+		"salsa20":          true,
+		"camellia-128-cfb": true,
+		"camellia-192-cfb": true,
+		"camellia-256-cfb": true,
+		"bf-cfb":           true,
+		"cast5-cfb":        true,
+		"des-cfb":          true,
+		"idea-cfb":         true,
+		"rc2-cfb":          true,
+		"seed-cfb":         true,
+	}
+	return validCiphers[strings.ToLower(cipher)]
 }
 
 func parseSSPlugin(raw string) (string, map[string]interface{}) {

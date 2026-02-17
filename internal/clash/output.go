@@ -15,13 +15,23 @@ import (
 
 func BuildFilteredURLList(nodes []model.Node, results []model.Result, settings model.TestSettings) []string {
 	var lines []string
+	hasResults := len(results) > 0
+
 	for i, node := range nodes {
-		if i >= len(results) {
-			continue
+		// 如果有测试结果，只导出通过的节点
+		if hasResults {
+			if i >= len(results) {
+				continue
+			}
+			res := results[i]
+			if !res.Done || !res.Pass {
+				continue
+			}
 		}
-		res := results[i]
-		if !res.Done || !res.Pass {
-			continue
+
+		var res model.Result
+		if i < len(results) {
+			res = results[i]
 		}
 		name, _ := util.BuildOutputName(node, settings, res)
 		// 对名称进行地区缩写处理
@@ -534,14 +544,18 @@ func BuildFilteredProxyList(nodes []model.Node, results []model.Result, settings
 
 	var proxies []map[string]interface{}
 	nameCount := make(map[string]int)
+	hasResults := len(results) > 0
 
 	for i, node := range nodes {
-		if i >= len(results) {
-			continue
-		}
-		res := results[i]
-		if !res.Done || !res.Pass {
-			continue
+		// 如果有测试结果，只导出通过的节点
+		if hasResults {
+			if i >= len(results) {
+				continue
+			}
+			res := results[i]
+			if !res.Done || !res.Pass {
+				continue
+			}
 		}
 
 		// Type filtering
@@ -552,6 +566,10 @@ func BuildFilteredProxyList(nodes []model.Node, results []model.Result, settings
 			}
 		}
 
+		var res model.Result
+		if i < len(results) {
+			res = results[i]
+		}
 		baseName, _ := util.BuildOutputName(node, settings, res)
 		baseName = util.AbbreviateRegionInName(baseName)
 		name := util.UniqueName(baseName, nameCount)
